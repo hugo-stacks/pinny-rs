@@ -15,7 +15,7 @@ concurrency:
     cancel-in-progress: true
 
 env:
-  NEXTEST_VERSION: 0.9.88
+  NEXTEST_VERSION: 0.9.93
 
 jobs:
     lint:
