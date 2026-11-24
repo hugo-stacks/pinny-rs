@@ -57,6 +57,7 @@ pub fn resolve_tag(
     let ItemFn {
         attrs: mut fn_attrs,
         vis,
+        modifiers: _,
         sig: mut fn_sign,
         block: fn_block,
     } = fn_item;

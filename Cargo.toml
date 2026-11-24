@@ -4,7 +4,6 @@ version = "0.0.2"
 authors = ["Federico De Felici <federico@bitcoinl2labs.com>"]
 edition = "2021"
 license = "GPLv3"
-homepage = "https://github.com/BitcoinL2-Labs/pinny-rs"
 repository = "https://github.com/BitcoinL2-Labs/pinny-rs"
 description = "Tags your tests and run what matters"
 keywords = [ "test", "testing", "tagging", "tag", "pinning" ]
@@ -21,17 +20,17 @@ default = []
 debug = []
 
 [dependencies]
-proc-macro2 = { version = "1.0.32", default-features = false }
+proc-macro2 = { version = "1.0", default-features = false }
 quote = { version = "1.0", default-features = false }
-syn = { version = "2.0", default-features = false, features = ["full", "parsing", "printing", "proc-macro"] }
-toml = "0.5"           # used this version to align with stacks-core dependency
-thiserror = "1.0.56"   # used this version to avoid `syn` conflict with stacks-core
+syn = { version = "3.0", default-features = false, features = ["full", "parsing", "printing", "proc-macro"] }
+toml = { version = "1.2", default-features = false, features = ["parse", "serde", "std"] }
+thiserror = "2.0"
 regex = "1"
 
 [dev-dependencies]
-tempfile = "3.3"
-trybuild = "1.0.83"
-serial_test = "2"
+tempfile = "3"
+trybuild = "1.0"
+serial_test = "4"
 
 # Used for integration test purpose
 tokio = {version = "1.0", features = ["rt-multi-thread", "macros"]}
