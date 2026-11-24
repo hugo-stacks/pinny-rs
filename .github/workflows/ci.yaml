@@ -37,6 +37,10 @@ jobs:
               id: lint_rustfmt
               run: cargo pinny-fmt --check
 
+            - name: Check Lockfile
+              id: check_lockfile
+              run: cargo fetch --locked
+
             - name: Lint (Clippy)
               id: lint_clippy
               run: cargo pinny-clippy
@@ -63,7 +67,7 @@ jobs:
 
             - name: Execute Tests
               id: execute_tests
-              run: cargo-nextest nextest run --color always --no-fail-fast 
+              run: cargo-nextest nextest run --locked --color always --no-fail-fast
 
     check:
         name: All Checks Passed
