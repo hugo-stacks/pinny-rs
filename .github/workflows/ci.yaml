@@ -8,31 +8,36 @@ on:
     pull_request:
         types: [opened, synchronize, reopened]
 
-permissions: read-all
+permissions: {}
 
 concurrency:
     group: push-pr-${{ github.head_ref || github.ref_name || github.run_id}}
     cancel-in-progress: true
 
 env:
-  NEXTEST_VERSION: 0.9.93
+  NEXTEST_VERSION: 0.9.152
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  CARGO_PROFILE_DEV_DEBUG: 0
 
 jobs:
     lint:
         name: Run Lints
         runs-on: ubuntu-24.04
+        timeout-minutes: 10
+        permissions:
+            contents: read
         steps:
             - name: Checkout Repository
               id: checkout_Repository
-              uses: stacks-sbtc/actions/checkout@ed353a33594a2fa97ea6702d838e4a935cce374d # main as of 2026-08-19
-            
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+              with:
+                persist-credentials: false
+
             - name: Setup Rust
               id: setup_rust
-              uses: stacks-sbtc/actions/setup-rust-toolchain@ed353a33594a2fa97ea6702d838e4a935cce374d # main as of 2026-08-19
-              with:
-                # components: clippy, rustfmt
-                cache-key: "rust-cache"
-            
+              run: rustup toolchain install --no-self-update
+
             - name: Lint (Rustfmt)
               id: lint_rustfmt
               run: cargo pinny-fmt --check
@@ -48,22 +53,26 @@ jobs:
     tests:
         name: Run Tests
         runs-on: ubuntu-24.04
+        timeout-minutes: 10
+        permissions:
+            contents: read
         steps:
             - name: Checkout Repository
               id: checkout_Repository
-              uses: stacks-sbtc/actions/checkout@ed353a33594a2fa97ea6702d838e4a935cce374d # main as of 2026-08-19
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+              with:
+                persist-credentials: false
 
             - name: Setup Rust
               id: setup_rust
-              uses: stacks-sbtc/actions/setup-rust-toolchain@ed353a33594a2fa97ea6702d838e4a935cce374d # main as of 2026-08-19
-              with:
-                cache-key: "rust-cache"
+              run: rustup toolchain install --no-self-update
 
-            - name: Install Action
-              id: install_action
-              uses: stacks-sbtc/actions/install-action@ed353a33594a2fa97ea6702d838e4a935cce374d # main as of 2026-08-19
+            - name: Install Nextest
+              id: install_nextest
+              uses: taiki-e/install-action@75a7c0f87bd666af3cdb75c5b9e9d03ab6044e6f # v2.90.6
               with:
                 tool: nextest@${{ env.NEXTEST_VERSION }}
+                fallback: none
 
             - name: Execute Tests
               id: execute_tests
@@ -72,6 +81,7 @@ jobs:
     check:
         name: All Checks Passed
         runs-on: ubuntu-24.04
+        timeout-minutes: 5
         needs:
             - lint
             - tests
