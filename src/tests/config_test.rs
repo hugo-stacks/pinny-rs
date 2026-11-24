@@ -1,27 +1,49 @@
 use crate::config::*;
-use serial_test::serial;
-use std::{fs::File, io::Write};
-use tempfile::{TempDir, tempdir};
+use std::path::PathBuf;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{SystemTime, UNIX_EPOCH};
+
+/// A directory under the system temp dir that is removed on drop.
+struct TempDir {
+    path: PathBuf,
+}
+
+impl TempDir {
+    fn new() -> Self {
+        static COUNTER: AtomicU64 = AtomicU64::new(0);
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_or(0, |elapsed| elapsed.as_nanos());
+        let name = format!(
+            "pinny-test-{}-{}-{nanos}",
+            std::process::id(),
+            COUNTER.fetch_add(1, Ordering::Relaxed)
+        );
+        let path = std::env::temp_dir().join(name);
+        std::fs::create_dir(&path).expect("failed to create temp dir");
+        Self { path }
+    }
+
+    fn manifest_dir(&self) -> &str {
+        self.path.to_str().expect("temp dir path is not UTF-8")
+    }
+}
+
+impl Drop for TempDir {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.path);
+    }
+}
 
 fn create_cargo_toml(content: &str) -> TempDir {
-    let tmp_dir = tempdir().unwrap();
-    let dir_path = tmp_dir.path();
-    let cargo_path = dir_path.join("Cargo.toml");
-    let mut cargo =
-        File::create(cargo_path).expect("failed to create Cargo.toml file");
-    cargo.write_all(content.as_bytes()).expect("cannot write");
+    let tmp_dir = TempDir::new();
+    std::fs::write(tmp_dir.path.join("Cargo.toml"), content)
+        .expect("failed to write Cargo.toml file");
     tmp_dir
 }
 
-/// Point `CARGO_MANIFEST_DIR` at `dir` for the current test.
-fn set_manifest_dir(dir: &TempDir) {
-    // SAFETY: every test that reads or writes the environment in this binary
-    // is `#[serial]`, so no other thread touches it concurrently.
-    unsafe { std::env::set_var("CARGO_MANIFEST_DIR", dir.path()) };
-}
-
 #[test]
-#[serial]
 fn test_create_config_with_3_tags_ok() {
     let content = r#"
 [Package]
@@ -33,9 +55,8 @@ allowed = ["tag1", "tag2", "tag3"]
 "#;
 
     let tmp_dir = create_cargo_toml(content);
-    set_manifest_dir(&tmp_dir);
 
-    let config_result = ConfigFactory::create();
+    let config_result = ConfigFactory::create_for(tmp_dir.manifest_dir());
     assert!(config_result.is_ok());
 
     let config = config_result.unwrap();
@@ -47,7 +68,6 @@ allowed = ["tag1", "tag2", "tag3"]
 }
 
 #[test]
-#[serial]
 fn test_get_instance_caches_config_per_manifest_dir_ok() {
     let content_a = r#"
 [Package]
@@ -71,27 +91,24 @@ allowed = ["tag_b"]
 
     // Simulate a single long-lived process (e.g. rust-analyzer's proc-macro
     // server) expanding macros for two crates with different allowed tags.
-    set_manifest_dir(&tmp_dir_a);
-    let config_a = Config::get_instance().unwrap();
+    let config_a = Config::get_instance_for(tmp_dir_a.manifest_dir()).unwrap();
     assert_eq!(vec!["tag_a".to_string()], config_a.allowed_tags);
 
-    set_manifest_dir(&tmp_dir_b);
-    let config_b = Config::get_instance().unwrap();
+    let config_b = Config::get_instance_for(tmp_dir_b.manifest_dir()).unwrap();
     assert_eq!(vec!["tag_b".to_string()], config_b.allowed_tags);
 
     // The first crate's config must still be served on a cache hit.
-    set_manifest_dir(&tmp_dir_a);
-    let config_a_again = Config::get_instance().unwrap();
+    let config_a_again =
+        Config::get_instance_for(tmp_dir_a.manifest_dir()).unwrap();
     assert_eq!(vec!["tag_a".to_string()], config_a_again.allowed_tags);
+    assert!(Arc::ptr_eq(&config_a, &config_a_again));
 }
 
 #[test]
-#[serial]
 fn test_create_config_with_missing_file_ko() {
-    let tmp_dir = tempdir().unwrap();
-    set_manifest_dir(&tmp_dir);
+    let tmp_dir = TempDir::new();
 
-    let config_result = ConfigFactory::create();
+    let config_result = ConfigFactory::create_for(tmp_dir.manifest_dir());
     assert!(config_result.is_err());
     assert!(matches!(
         config_result.err().unwrap(),
@@ -100,7 +117,6 @@ fn test_create_config_with_missing_file_ko() {
 }
 
 #[test]
-#[serial]
 fn test_create_config_with_invalid_toml_ko() {
     let content = r#"
 [Pa
@@ -111,9 +127,8 @@ version = "0.0.1"
 "#;
 
     let tmp_dir = create_cargo_toml(content);
-    set_manifest_dir(&tmp_dir);
 
-    let config_result = ConfigFactory::create();
+    let config_result = ConfigFactory::create_for(tmp_dir.manifest_dir());
     assert!(config_result.is_err());
     assert!(matches!(
         config_result.err().unwrap(),
@@ -122,7 +137,6 @@ version = "0.0.1"
 }
 
 #[test]
-#[serial]
 fn test_create_config_with_missing_allowed_tags_ko() {
     let content = r#"
 [Package]
@@ -133,15 +147,13 @@ version = "0.0.1"
 "#;
 
     let tmp_dir = create_cargo_toml(content);
-    set_manifest_dir(&tmp_dir);
 
-    let config_result = ConfigFactory::create();
+    let config_result = ConfigFactory::create_for(tmp_dir.manifest_dir());
     assert!(config_result.is_err());
     assert_eq!(ConfigError::MissingTags, config_result.err().unwrap());
 }
 
 #[test]
-#[serial]
 fn test_create_config_with_missing_metadata_ko() {
     let content = r#"
 [Package]
@@ -150,15 +162,13 @@ version = "0.0.1"
 "#;
 
     let tmp_dir = create_cargo_toml(content);
-    set_manifest_dir(&tmp_dir);
 
-    let config_result = ConfigFactory::create();
+    let config_result = ConfigFactory::create_for(tmp_dir.manifest_dir());
     assert!(config_result.is_err());
     assert_eq!(ConfigError::MissingTags, config_result.err().unwrap());
 }
 
 #[test]
-#[serial]
 fn test_create_config_with_duplicated_tag_ko() {
     let content = r#"
 [Package]
@@ -170,9 +180,8 @@ allowed = ["tag1", "tag1", "tag3"]
 "#;
 
     let tmp_dir = create_cargo_toml(content);
-    set_manifest_dir(&tmp_dir);
 
-    let config_result = ConfigFactory::create();
+    let config_result = ConfigFactory::create_for(tmp_dir.manifest_dir());
     assert!(config_result.is_err());
     assert_eq!(
         ConfigError::DuplicateTag("tag1".into()),
@@ -181,7 +190,6 @@ allowed = ["tag1", "tag1", "tag3"]
 }
 
 #[test]
-#[serial]
 fn test_create_config_with_invalid_tag_format_ko() {
     let content = r#"
 [Package]
@@ -193,9 +201,8 @@ allowed = ["?invalid", "tag2", "tag3"]
 "#;
 
     let tmp_dir = create_cargo_toml(content);
-    set_manifest_dir(&tmp_dir);
 
-    let config_result = ConfigFactory::create();
+    let config_result = ConfigFactory::create_for(tmp_dir.manifest_dir());
     assert!(config_result.is_err());
     assert_eq!(
         ConfigError::InvalidTagFormat("?invalid".into()),
@@ -204,7 +211,6 @@ allowed = ["?invalid", "tag2", "tag3"]
 }
 
 #[test]
-#[serial]
 fn test_create_config_with_invalid_tags_array_ko() {
     let content = r#"
 [Package]
@@ -216,12 +222,39 @@ allowed = "tag1"
 "#;
 
     let tmp_dir = create_cargo_toml(content);
-    set_manifest_dir(&tmp_dir);
 
-    let config_result = ConfigFactory::create();
+    let config_result = ConfigFactory::create_for(tmp_dir.manifest_dir());
     assert!(config_result.is_err());
     assert_eq!(
         ConfigError::InvalidArrayFormat,
         config_result.err().unwrap()
     );
+}
+
+#[test]
+fn test_create_config_tag_format_rule() {
+    let config_for = |tag: &str| {
+        let content =
+            format!("[package.metadata.pinny]\nallowed = [\"{tag}\"]\n");
+        let tmp_dir = create_cargo_toml(&content);
+        ConfigFactory::create_for(tmp_dir.manifest_dir())
+    };
+
+    for valid in ["a", "tag", "tag_1", "t__", "a0_b9_z"] {
+        let config = config_for(valid).unwrap();
+        assert_eq!(vec![valid.to_string()], config.allowed_tags);
+    }
+
+    for invalid in [
+        "", "_tag", "1tag", "Tag", "tAg", "tag-1", "tag 1", " tag", "tag\\n",
+        "tàg", "étag", "tag１",
+    ] {
+        // `\\n` above is the TOML escape for a trailing newline.
+        let expected = invalid.replace("\\n", "\n");
+        assert_eq!(
+            ConfigError::InvalidTagFormat(expected),
+            config_for(invalid).err().unwrap(),
+            "tag {invalid:?} should be rejected"
+        );
+    }
 }

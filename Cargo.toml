@@ -23,14 +23,10 @@ debug = []
 proc-macro2 = { version = "1.0.91", default-features = false }
 quote = { version = "1.0.35", default-features = false }
 syn = { version = "3.0", default-features = false, features = ["full", "parsing", "printing", "proc-macro"] }
-toml = { version = "1.0", default-features = false, features = ["parse", "serde", "std"] }
-thiserror = "2.0"
-regex = "1.0"
+toml = { version = "1.1", default-features = false, features = ["parse"] }
 
 [dev-dependencies]
-tempfile = "3.0"
 trybuild = "1.0.86"
-serial_test = "4.0"
 
 # Used for integration test purpose
 tokio = {version = "1.0", features = ["rt-multi-thread", "macros"]}
