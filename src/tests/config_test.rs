@@ -1,7 +1,7 @@
 use crate::config::*;
 use serial_test::serial;
 use std::{fs::File, io::Write};
-use tempfile::{tempdir, TempDir};
+use tempfile::{TempDir, tempdir};
 
 fn create_cargo_toml(content: &str) -> TempDir {
     let tmp_dir = tempdir().unwrap();
@@ -11,6 +11,13 @@ fn create_cargo_toml(content: &str) -> TempDir {
         File::create(cargo_path).expect("failed to create Cargo.toml file");
     cargo.write_all(content.as_bytes()).expect("cannot write");
     tmp_dir
+}
+
+/// Point `CARGO_MANIFEST_DIR` at `dir` for the current test.
+fn set_manifest_dir(dir: &TempDir) {
+    // SAFETY: every test that reads or writes the environment in this binary
+    // is `#[serial]`, so no other thread touches it concurrently.
+    unsafe { std::env::set_var("CARGO_MANIFEST_DIR", dir.path()) };
 }
 
 #[test]
@@ -26,7 +33,7 @@ allowed = ["tag1", "tag2", "tag3"]
 "#;
 
     let tmp_dir = create_cargo_toml(content);
-    std::env::set_var("CARGO_MANIFEST_DIR", tmp_dir.path());
+    set_manifest_dir(&tmp_dir);
 
     let config_result = ConfigFactory::create();
     assert!(config_result.is_ok());
@@ -64,16 +71,16 @@ allowed = ["tag_b"]
 
     // Simulate a single long-lived process (e.g. rust-analyzer's proc-macro
     // server) expanding macros for two crates with different allowed tags.
-    std::env::set_var("CARGO_MANIFEST_DIR", tmp_dir_a.path());
+    set_manifest_dir(&tmp_dir_a);
     let config_a = Config::get_instance().unwrap();
     assert_eq!(vec!["tag_a".to_string()], config_a.allowed_tags);
 
-    std::env::set_var("CARGO_MANIFEST_DIR", tmp_dir_b.path());
+    set_manifest_dir(&tmp_dir_b);
     let config_b = Config::get_instance().unwrap();
     assert_eq!(vec!["tag_b".to_string()], config_b.allowed_tags);
 
     // The first crate's config must still be served on a cache hit.
-    std::env::set_var("CARGO_MANIFEST_DIR", tmp_dir_a.path());
+    set_manifest_dir(&tmp_dir_a);
     let config_a_again = Config::get_instance().unwrap();
     assert_eq!(vec!["tag_a".to_string()], config_a_again.allowed_tags);
 }
@@ -82,7 +89,7 @@ allowed = ["tag_b"]
 #[serial]
 fn test_create_config_with_missing_file_ko() {
     let tmp_dir = tempdir().unwrap();
-    std::env::set_var("CARGO_MANIFEST_DIR", tmp_dir.path());
+    set_manifest_dir(&tmp_dir);
 
     let config_result = ConfigFactory::create();
     assert!(config_result.is_err());
@@ -104,7 +111,7 @@ version = "0.0.1"
 "#;
 
     let tmp_dir = create_cargo_toml(content);
-    std::env::set_var("CARGO_MANIFEST_DIR", tmp_dir.path());
+    set_manifest_dir(&tmp_dir);
 
     let config_result = ConfigFactory::create();
     assert!(config_result.is_err());
@@ -126,7 +133,7 @@ version = "0.0.1"
 "#;
 
     let tmp_dir = create_cargo_toml(content);
-    std::env::set_var("CARGO_MANIFEST_DIR", tmp_dir.path());
+    set_manifest_dir(&tmp_dir);
 
     let config_result = ConfigFactory::create();
     assert!(config_result.is_err());
@@ -143,7 +150,7 @@ version = "0.0.1"
 "#;
 
     let tmp_dir = create_cargo_toml(content);
-    std::env::set_var("CARGO_MANIFEST_DIR", tmp_dir.path());
+    set_manifest_dir(&tmp_dir);
 
     let config_result = ConfigFactory::create();
     assert!(config_result.is_err());
@@ -163,7 +170,7 @@ allowed = ["tag1", "tag1", "tag3"]
 "#;
 
     let tmp_dir = create_cargo_toml(content);
-    std::env::set_var("CARGO_MANIFEST_DIR", tmp_dir.path());
+    set_manifest_dir(&tmp_dir);
 
     let config_result = ConfigFactory::create();
     assert!(config_result.is_err());
@@ -186,7 +193,7 @@ allowed = ["?invalid", "tag2", "tag3"]
 "#;
 
     let tmp_dir = create_cargo_toml(content);
-    std::env::set_var("CARGO_MANIFEST_DIR", tmp_dir.path());
+    set_manifest_dir(&tmp_dir);
 
     let config_result = ConfigFactory::create();
     assert!(config_result.is_err());
@@ -209,7 +216,7 @@ allowed = "tag1"
 "#;
 
     let tmp_dir = create_cargo_toml(content);
-    std::env::set_var("CARGO_MANIFEST_DIR", tmp_dir.path());
+    set_manifest_dir(&tmp_dir);
 
     let config_result = ConfigFactory::create();
     assert!(config_result.is_err());
