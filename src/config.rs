@@ -108,7 +108,7 @@ impl ConfigFactory {
     pub fn create_for(manifest_dir: &str) -> Result<Config, ConfigError> {
         let cargo_path = std::path::Path::new(manifest_dir).join("Cargo.toml");
         let cargo_string = std::fs::read_to_string(cargo_path)?;
-        let cargo_toml: toml::Value = cargo_string.parse()?;
+        let cargo_toml: toml::Table = cargo_string.parse()?;
 
         let allowed_tags = cargo_toml
             .get("package")

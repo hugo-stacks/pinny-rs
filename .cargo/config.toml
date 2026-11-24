@@ -1,3 +1,6 @@
 [alias]
-pinny-fmt = "fmt -- --config edition=2021,hard_tabs=false,max_width=80"
+pinny-fmt = "fmt -- --config edition=2024,hard_tabs=false,max_width=80"
 pinny-clippy = "clippy --all-targets --all-features -- -D warnings -W clippy::all -W clippy::pedantic -W clippy::nursery -W clippy::cargo -A clippy::multiple-crate-versions"
+
+[registry]
+global-min-publish-age = "3 days"

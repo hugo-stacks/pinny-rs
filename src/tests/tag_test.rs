@@ -1,7 +1,7 @@
 use crate::tag::*;
 use proc_macro2::TokenStream;
 use quote::ToTokens;
-use syn::{parse_quote, Attribute, ItemFn};
+use syn::{Attribute, ItemFn, parse_quote};
 
 #[test]
 fn test_parse_tag_labels() {

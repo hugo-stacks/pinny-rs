@@ -5,12 +5,12 @@ use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 use std::collections::HashSet;
 use syn::{
+    Attribute, Error, Ident, ItemFn, Meta, MetaNameValue, PathArguments,
+    PathSegment, Result,
     parse::{Parse, Parser},
     punctuated::Punctuated,
     spanned::Spanned,
     token::Comma,
-    Attribute, Error, Ident, ItemFn, Meta, MetaNameValue, PathArguments,
-    PathSegment, Result,
 };
 
 /// Representation of a comma separated tag label list
@@ -57,6 +57,7 @@ pub fn resolve_tag(
     let ItemFn {
         attrs: mut fn_attrs,
         vis,
+        modifiers: _,
         sig: mut fn_sign,
         block: fn_block,
     } = fn_item;
@@ -160,7 +161,8 @@ pub fn validate_tag_labels(
             return Err(Error::new_spanned(
                 tags,
                 format!(
-                    "Invalid tag '{each_tag_str}'. Allowed tags are: {allowed_labels:?}."),
+                    "Invalid tag '{each_tag_str}'. Allowed tags are: {allowed_labels:?}."
+                ),
             ));
         }
     }
