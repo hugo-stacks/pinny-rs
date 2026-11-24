@@ -23,7 +23,7 @@ env:
 jobs:
     lint:
         name: Run Lints
-        runs-on: ubuntu-24.04
+        runs-on: ubuntu-latest
         timeout-minutes: 10
         permissions:
             contents: read
@@ -52,7 +52,7 @@ jobs:
 
     tests:
         name: Run Tests
-        runs-on: ubuntu-24.04
+        runs-on: ubuntu-latest
         timeout-minutes: 10
         permissions:
             contents: read
@@ -80,7 +80,7 @@ jobs:
 
     check:
         name: All Checks Passed
-        runs-on: ubuntu-24.04
+        runs-on: ubuntu-latest
         timeout-minutes: 5
         needs:
             - lint
