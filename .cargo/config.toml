@@ -5,4 +5,4 @@ pinny-clippy = "clippy --all-targets --all-features -- -D warnings -W clippy::al
 # Supply-chain guard: the resolver ignores registry versions published less
 # than this long ago (unless already pinned in Cargo.lock). Requires cargo 1.100+.
 [registry]
-global-min-publish-age = "7 days"
+global-min-publish-age = "3 days"
