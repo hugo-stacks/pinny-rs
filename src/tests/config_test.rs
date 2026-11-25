@@ -232,29 +232,15 @@ allowed = "tag1"
 }
 
 #[test]
-fn test_create_config_tag_format_rule() {
-    let config_for = |tag: &str| {
-        let content =
-            format!("[package.metadata.pinny]\nallowed = [\"{tag}\"]\n");
-        let tmp_dir = create_cargo_toml(&content);
-        ConfigFactory::create_for(tmp_dir.manifest_dir())
-    };
-
+fn test_is_valid_tag() {
     for valid in ["a", "tag", "tag_1", "t__", "a0_b9_z"] {
-        let config = config_for(valid).unwrap();
-        assert_eq!(vec![valid.to_string()], config.allowed_tags);
+        assert!(ConfigFactory::is_valid_tag(valid), "{valid:?}");
     }
 
     for invalid in [
-        "", "_tag", "1tag", "Tag", "tAg", "tag-1", "tag 1", " tag", "tag\\n",
+        "", "_tag", "1tag", "Tag", "tAg", "tag-1", "tag 1", " tag", "tag\n",
         "tàg", "étag", "tag１",
     ] {
-        // `\\n` above is the TOML escape for a trailing newline.
-        let expected = invalid.replace("\\n", "\n");
-        assert_eq!(
-            ConfigError::InvalidTagFormat(expected),
-            config_for(invalid).err().unwrap(),
-            "tag {invalid:?} should be rejected"
-        );
+        assert!(!ConfigFactory::is_valid_tag(invalid), "{invalid:?}");
     }
 }

@@ -190,7 +190,7 @@ impl ConfigFactory {
 
     /// A valid tag is an ASCII lowercase letter followed by ASCII lowercase
     /// letters, digits or `_`.
-    fn is_valid_tag(tag: &str) -> bool {
+    pub fn is_valid_tag(tag: &str) -> bool {
         let mut chars = tag.chars();
         chars.next().is_some_and(|first| first.is_ascii_lowercase())
             && chars.all(|c| {
