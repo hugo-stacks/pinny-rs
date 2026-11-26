@@ -46,6 +46,10 @@ jobs:
               id: check_lockfile
               run: cargo fetch --locked
 
+            - name: Check Build Without Dev Dependencies
+              id: check_build_without_dev_dependencies
+              run: cargo check --locked
+
             - name: Lint (Clippy)
               id: lint_clippy
               run: cargo pinny-clippy
