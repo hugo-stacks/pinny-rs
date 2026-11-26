@@ -84,21 +84,6 @@ impl std::fmt::Display for ConfigError {
     }
 }
 
-impl std::error::Error for ConfigError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            Self::MissingEnvVar(error) => Some(error),
-            Self::ReadError(error) => Some(error),
-            Self::ParseError(error) => Some(error),
-            Self::MissingTags
-            | Self::InvalidArrayFormat
-            | Self::InvalidStringType
-            | Self::DuplicateTag(_)
-            | Self::InvalidTagFormat(_) => None,
-        }
-    }
-}
-
 impl From<std::env::VarError> for ConfigError {
     fn from(error: std::env::VarError) -> Self {
         Self::MissingEnvVar(error)
@@ -188,8 +173,10 @@ impl ConfigFactory {
         Ok(Config { allowed_tags })
     }
 
-    /// A valid tag is an ASCII lowercase letter followed by ASCII lowercase
-    /// letters, digits or `_`.
+    /// Returns `true` if `tag` consists of an ASCII lowercase letter followed
+    /// by zero or more ASCII lowercase letters, digits, or underscores.
+    ///
+    /// Equivalent to the regex `^[a-z][a-z0-9_]*$`.
     pub fn is_valid_tag(tag: &str) -> bool {
         let mut chars = tag.chars();
         chars.next().is_some_and(|first| first.is_ascii_lowercase())
