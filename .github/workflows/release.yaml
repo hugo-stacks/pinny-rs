@@ -64,34 +64,15 @@ jobs:
 
       - name: Validate Cargo.toml version
         id: validate_cargo_toml_version
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        with:
-          script: |
-            const version = process.env.SEMVER;
-            const fs = require('fs');
-            const tomlFilePath = './Cargo.toml';
+        run: |
+          pkg_version=$(python3 -c 'import tomllib; print(tomllib.load(open("Cargo.toml", "rb"))["package"]["version"])')
 
-            try {
-              const cargoToml = fs.readFileSync(tomlFilePath, 'utf-8');
-              const packageSection = cargoToml
-                .split(/^\[/m)
-                .find((section) => section.startsWith('package]'));
-              const match = packageSection?.match(/^version\s*=\s*"([^"]+)"/m);
-
-              if (!match) {
-                core.setFailed(`Missing "package.version" in Cargo.toml`);
-              } else {
-                const pkg_version = match[1];
-
-                if (pkg_version === version) {
-                  console.log(`Cargo.toml contains version ${version}`);
-                } else {
-                  core.setFailed(`Version ${version} not matching "package.version" ${pkg_version} in Cargo.toml`);
-                }
-              }
-            } catch (error) {
-              core.setFailed(`Failed to read Cargo.toml: ${error.message}`);
-            }
+          if [ "$pkg_version" = "$SEMVER" ]; then
+            echo "Cargo.toml contains version $SEMVER"
+          else
+            echo "::error::Version $SEMVER not matching \"package.version\" $pkg_version in Cargo.toml"
+            exit 1
+          fi
 
       - name: Validate CI result
         id: validate_ci_result
