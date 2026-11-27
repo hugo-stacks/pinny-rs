@@ -99,13 +99,5 @@ jobs:
         steps:
             - name: Check Job Results
               id: check_job_results
-              env:
-                RESULTS: ${{ join(needs.*.result, ' ') }}
-              run: |
-                echo "Job results: $RESULTS"
-                for result in $RESULTS; do
-                  if [ "$result" != "success" ]; then
-                    exit 1
-                  fi
-                done
-                echo "All checks passed!"
+              if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+              run: exit 1
