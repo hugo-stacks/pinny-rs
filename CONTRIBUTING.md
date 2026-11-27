@@ -32,7 +32,8 @@ Releases are made from `main` by a maintainer, using the
    merge on `main` to pass too.
 3. In the repository's **Actions** tab, select **Release**, then
    **Run workflow**. Leave the branch on `main` and enter the version without
-   the `v` prefix, for example `1.2.3`.
+   the `v` prefix, for example `1.2.3`. GitHub runs the workflow file of the
+   selected branch, and the one on `main` refuses to run from any other.
 
 The workflow then:
 
@@ -45,6 +46,10 @@ The workflow then:
   pull requests.
 
 If a check fails, nothing is created: fix the cause and run the workflow
-again. If the tag already exists, the workflow stops without changing it. If
-the tag was created but the release was not, either create the release for
-that tag in the GitHub UI, or delete the tag and run the workflow again.
+again. The CI check needs a run of the CI workflow for the latest commit of
+`main`: a commit merged with `[skip ci]` has none, so another commit has to
+land first.
+
+If the tag already exists on another commit, the workflow stops without
+changing it. If the tag was created but the release was not, re-run the
+failed job: it keeps the tag and creates the release.

@@ -64,15 +64,26 @@ jobs:
 
       - name: Validate Cargo.toml version
         id: validate_cargo_toml_version
+        shell: python3 -I {0}
         run: |
-          pkg_version=$(python3 -c 'import tomllib; print(tomllib.load(open("Cargo.toml", "rb"))["package"]["version"])')
+          import os
+          import sys
+          import tomllib
 
-          if [ "$pkg_version" = "$SEMVER" ]; then
-            echo "Cargo.toml contains version $SEMVER"
-          else
-            echo "::error::Version $SEMVER not matching \"package.version\" $pkg_version in Cargo.toml"
-            exit 1
-          fi
+          version = os.environ["SEMVER"]
+
+          try:
+              with open("Cargo.toml", "rb") as manifest:
+                  pkg_version = tomllib.load(manifest)["package"]["version"]
+          except (OSError, KeyError, tomllib.TOMLDecodeError) as error:
+              print(f'::error::Failed to read "package.version" in Cargo.toml: {error!r}')
+              sys.exit(1)
+
+          if pkg_version != version:
+              print(f'::error::Version {version} not matching "package.version" {pkg_version!r} in Cargo.toml')
+              sys.exit(1)
+
+          print(f"Cargo.toml contains version {version}")
 
       - name: Validate CI result
         id: validate_ci_result
@@ -83,20 +94,27 @@ jobs:
           script: |
             const commit_sha = process.env.RELEASE_SHA;
             const branch = process.env.SOURCE_BRANCH;
+            const workflow = 'ci.yaml';
 
-            const runs = await github.rest.actions.listWorkflowRuns({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              workflow_id: 'ci.yaml',
-              branch,
-              event: 'push',
-              head_sha: commit_sha,
-              per_page: 1
-            });
+            let runs;
+            try {
+              runs = await github.rest.actions.listWorkflowRuns({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: workflow,
+                branch,
+                event: 'push',
+                head_sha: commit_sha,
+                per_page: 1
+              });
+            } catch (error) {
+              core.setFailed(`Failed to list the runs of workflow ${workflow}: ${error.message}`);
+              return;
+            }
             const run = runs.data.workflow_runs[0];
 
             if (!run) {
-              core.setFailed(`No CI run found for ${commit_sha} on ${branch}`);
+              core.setFailed(`No push run of ${workflow} found for ${commit_sha}: CI must have run on the latest commit of ${branch}`);
             } else if (run.conclusion !== 'success') {
               core.setFailed(`CI has not passed for ${commit_sha} (${run.conclusion ?? run.status}): ${run.html_url}`);
             } else {
@@ -122,13 +140,33 @@ jobs:
             const tag = `v${process.env.SEMVER}`;
             const commit_sha = process.env.RELEASE_SHA;
 
-            console.log(`Tagging ${commit_sha} as ${tag}`);
-            await github.rest.git.createRef({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              ref: `refs/tags/${tag}`,
-              sha: commit_sha
-            });
+            let existing_sha;
+            try {
+              const existing = await github.rest.git.getRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: `tags/${tag}`
+              });
+              existing_sha = existing.data.object.sha;
+            } catch (error) {
+              if (error.status !== 404) {
+                throw error;
+              }
+            }
+
+            if (existing_sha === commit_sha) {
+              console.log(`Tag ${tag} already points at ${commit_sha}`);
+            } else if (existing_sha) {
+              core.setFailed(`Tag ${tag} already exists on ${existing_sha}`);
+            } else {
+              console.log(`Tagging ${commit_sha} as ${tag}`);
+              await github.rest.git.createRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: `refs/tags/${tag}`,
+                sha: commit_sha
+              });
+            }
 
       - name: Create GitHub Release
         id: create_github_release
