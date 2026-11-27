@@ -75,8 +75,8 @@ jobs:
           try:
               with open("Cargo.toml", "rb") as manifest:
                   pkg_version = tomllib.load(manifest)["package"]["version"]
-          except (OSError, KeyError, tomllib.TOMLDecodeError) as error:
-              print(f'::error::Failed to read "package.version" in Cargo.toml: {error!r}')
+          except (OSError, KeyError, TypeError, ValueError) as error:
+              print(f'::error::Failed to read "package.version" in Cargo.toml: {type(error).__name__}: {error}')
               sys.exit(1)
 
           if pkg_version != version:
@@ -140,24 +140,33 @@ jobs:
             const tag = `v${process.env.SEMVER}`;
             const commit_sha = process.env.RELEASE_SHA;
 
-            let existing_sha;
+            let existing;
             try {
-              const existing = await github.rest.git.getRef({
+              const ref = await github.rest.git.getRef({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 ref: `tags/${tag}`
               });
-              existing_sha = existing.data.object.sha;
+              existing = ref.data.object;
             } catch (error) {
               if (error.status !== 404) {
                 throw error;
               }
             }
 
-            if (existing_sha === commit_sha) {
+            if (existing?.type === 'tag') {
+              const annotated = await github.rest.git.getTag({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                tag_sha: existing.sha
+              });
+              existing = annotated.data.object;
+            }
+
+            if (existing?.sha === commit_sha) {
               console.log(`Tag ${tag} already points at ${commit_sha}`);
-            } else if (existing_sha) {
-              core.setFailed(`Tag ${tag} already exists on ${existing_sha}`);
+            } else if (existing) {
+              core.setFailed(`Tag ${tag} already exists on ${existing.sha}`);
             } else {
               console.log(`Tagging ${commit_sha} as ${tag}`);
               await github.rest.git.createRef({

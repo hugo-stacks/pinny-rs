@@ -33,7 +33,7 @@ Releases are made from `main` by a maintainer, using the
 3. In the repository's **Actions** tab, select **Release**, then
    **Run workflow**. Leave the branch on `main` and enter the version without
    the `v` prefix, for example `1.2.3`. GitHub runs the workflow file of the
-   selected branch, and the one on `main` refuses to run from any other.
+   selected branch, which fails when that branch is not `main`.
 
 The workflow then:
 
