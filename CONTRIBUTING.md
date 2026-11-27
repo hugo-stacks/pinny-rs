@@ -28,15 +28,18 @@ Releases are made from `main` by a maintainer, using the
 1. Open a pull request against `main` that sets the new `version` in
    `Cargo.toml`. Run `cargo check` so `Cargo.lock` is updated too, and commit
    both files: CI builds with `--locked` and fails on an outdated lock file.
-2. Merge the pull request once CI passes.
+2. Merge the pull request once CI passes, then wait for the CI run of the
+   merge on `main` to pass too.
 3. In the repository's **Actions** tab, select **Release**, then
    **Run workflow**. Leave the branch on `main` and enter the version without
    the `v` prefix, for example `1.2.3`.
 
 The workflow then:
 
+- checks that it was started from `main`;
 - checks that the version has the form `X.Y.Z`;
 - checks that `version` in `Cargo.toml` on `main` is the same version;
+- checks that CI passed on the latest commit of `main`;
 - tags the commit it checked as `vX.Y.Z`;
 - creates the GitHub release `vX.Y.Z`, with notes generated from the merged
   pull requests.
